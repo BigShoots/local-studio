@@ -139,6 +139,7 @@ win:
 
 linux:
   icon: public/icons/icon-512.png
+  syncDesktopName: true
   category: Development
   artifactName: Local-Studio-${version}-${arch}.${ext}
   target:

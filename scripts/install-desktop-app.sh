@@ -59,7 +59,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
     "Name=$desktop_name" \
     "Exec=env -u ELECTRON_RUN_AS_NODE APPIMAGE_EXTRACT_AND_RUN=1 $target" \
     "Icon=$app_name" \
-    'StartupWMClass=Local Studio' \
+    "StartupWMClass=$app_name" \
     'Categories=Development;' \
     'Terminal=false' > "$desktop_file"
   chmod 0644 "$desktop_file"
