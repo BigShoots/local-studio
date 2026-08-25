@@ -78,6 +78,7 @@ export async function startLocalController(): Promise<LocalControllerBootstrap |
     await execFileAsync("systemctl", ["--user", "start", service]);
     if (!(await waitForController(url, apiKey))) return null;
     process.env.LOCAL_STUDIO_API_KEY = apiKey;
+    process.env.API_KEY = apiKey;
     process.env.LOCAL_STUDIO_BACKEND_URL = url;
     process.env.BACKEND_URL = url;
     return { apiKey, service, url };
