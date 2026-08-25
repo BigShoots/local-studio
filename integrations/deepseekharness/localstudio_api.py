@@ -2,11 +2,40 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
 
 CONTROLLER_ROOT = os.environ.get("LOCALSTUDIO_CONTROLLER_URL", "http://127.0.0.1:8080").rstrip("/")
+
+
+class ControllerAPIError(RuntimeError):
+    def __init__(self, status: int, detail: str):
+        self.status = status
+        self.detail = detail
+        super().__init__(f"HTTP {status}: {detail}")
+
+
+def _error_detail(error: urllib.error.HTTPError) -> str:
+    try:
+        raw = error.read().decode("utf-8", "replace").strip()
+    except OSError:
+        raw = ""
+    if raw:
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return raw
+        if isinstance(payload, dict):
+            detail = payload.get("detail") or payload.get("message")
+            nested = payload.get("error")
+            if not detail and isinstance(nested, dict):
+                detail = nested.get("message") or nested.get("detail")
+            if isinstance(detail, str) and detail:
+                return detail
+        return raw
+    return str(error.reason or "controller request failed")
 
 
 def _env_value(path: Path, key: str) -> str | None:
@@ -63,6 +92,9 @@ def request_json(
             "Content-Type": "application/json",
         },
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        raw = response.read()
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as error:
+        raise ControllerAPIError(error.code, _error_detail(error)) from error
     return json.loads(raw.decode()) if raw else {}
