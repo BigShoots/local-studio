@@ -55,9 +55,13 @@ function canonicalNvidiaUuid(uuid: string): string {
   return `GPU-${uuid.slice(4).toLowerCase()}`;
 }
 
-function leaseableUuid(gpu: GpuInfo): string | null {
+function selectableDeviceId(gpu: GpuInfo): string | null {
   const uuid = gpu.uuid?.trim();
-  return uuid && fullNvidiaUuid.test(uuid) ? canonicalNvidiaUuid(uuid) : null;
+  if (uuid && fullNvidiaUuid.test(uuid)) return canonicalNvidiaUuid(uuid);
+  const pciBusId = gpu.pci_bus_id?.trim();
+  if (pciBusId) return pciBusId;
+  if (/intel/i.test(gpu.name)) return `intel:${gpu.index}`;
+  return null;
 }
 
 function appendUnique(values: string[], value: string): void {
@@ -72,7 +76,7 @@ export function resolveRecipeGpuUuids(
   const byUuid = new Map<string, string>();
   const allUuids: string[] = [];
   for (const gpu of gpus) {
-    const uuid = leaseableUuid(gpu);
+    const uuid = selectableDeviceId(gpu);
     if (!uuid) continue;
     if (!byIndex.has(gpu.index)) byIndex.set(gpu.index, uuid);
     byUuid.set(uuid.toLowerCase(), uuid);
