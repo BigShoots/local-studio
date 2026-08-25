@@ -57,7 +57,19 @@ export const dockerFlagsFor = (
         groupAdd: ["video", "render"],
       };
     case "xpu":
-      return { args: ["--device", "/dev/dri"], groupAdd: ["render"] };
+      return {
+        args: [
+          "--device",
+          "/dev/dri",
+          "--volume",
+          "/dev/dri:/dev/dri:ro",
+          "--volume",
+          "local-studio-vllm-xpu-cache:/root/.cache/vllm",
+          "--ipc",
+          "host",
+        ],
+        groupAdd: ["render"],
+      };
     case "metal":
     case "cpu":
       return { args: [], groupAdd: [] };

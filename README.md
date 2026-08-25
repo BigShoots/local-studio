@@ -10,7 +10,8 @@ and server surfaces.
 ## Download
 
 **[Download Local Studio for macOS (Apple Silicon)](https://github.com/sybil-solutions/local-studio/releases/latest/download/Local-Studio-arm64.dmg)**
-— signed and notarized; updates itself from GitHub releases. All versions on the
+- signed and notarized; updates itself from GitHub releases. Linux users can
+build and install the AppImage using the [Linux Intel XPU guide](docs/linux-intel-xpu.md). All versions are on the
 [releases page](https://github.com/sybil-solutions/local-studio/releases), or via
 [localstudio.ai](https://localstudio.ai).
 

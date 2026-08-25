@@ -28,7 +28,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
   fi
 
   shopt -s nullglob
-  built_candidates=("$output_root"/Local-Studio-*-x64.AppImage)
+  built_candidates=("$output_root"/Local-Studio-*.AppImage)
   shopt -u nullglob
   built="${LOCAL_STUDIO_BUILT_APP:-${built_candidates[0]:-}}"
   target="$install_root/$app_name"
@@ -57,7 +57,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
     '[Desktop Entry]' \
     'Type=Application' \
     "Name=$desktop_name" \
-    "Exec=$target" \
+    "Exec=env -u ELECTRON_RUN_AS_NODE APPIMAGE_EXTRACT_AND_RUN=1 $target" \
     "Icon=$app_name" \
     'Categories=Development;' \
     'Terminal=false' > "$desktop_file"

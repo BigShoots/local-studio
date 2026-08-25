@@ -150,7 +150,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: local-studio-${{ github.sha }}-linux-x64
-          path: frontend/dist-desktop/Local-Studio-*-x64.AppImage
+          path: frontend/dist-desktop/Local-Studio-*.AppImage
           if-no-files-found: error
           retention-days: 7
 

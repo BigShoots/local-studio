@@ -78,6 +78,10 @@ export const readConfigMetadata = (
       }),
     ),
     Effect.map((parsed) => {
+      const textConfig =
+        parsed["text_config"] && typeof parsed["text_config"] === "object"
+          ? (parsed["text_config"] as Record<string, unknown>)
+          : {};
       const architectures = parsed["architectures"];
       const architecture =
         Array.isArray(architectures) && architectures.length > 0 ? String(architectures[0]) : null;
@@ -85,7 +89,11 @@ export const readConfigMetadata = (
         parsed["max_position_embeddings"] ??
         parsed["max_seq_len"] ??
         parsed["seq_length"] ??
-        parsed["n_ctx"];
+        parsed["n_ctx"] ??
+        textConfig["max_position_embeddings"] ??
+        textConfig["max_seq_len"] ??
+        textConfig["seq_length"] ??
+        textConfig["n_ctx"];
       const contextLength =
         typeof raw === "number"
           ? raw

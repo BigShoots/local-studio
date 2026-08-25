@@ -58,6 +58,17 @@ const supports = (host: HostProfile): EngineSupport => {
   return host.dockerGpu ? supported("process", "docker") : supported("process");
 };
 
+const environment = (host: HostProfile): Readonly<Record<string, string>> =>
+  host.accelerator === "xpu"
+    ? {
+        VLLM_TARGET_DEVICE: "xpu",
+        ZE_FLAT_DEVICE_HIERARCHY: "COMPOSITE",
+        ZE_AFFINITY_MASK: "0",
+        VLLM_XPU_ENABLE_XPU_GRAPH: "1",
+        PYTORCH_ALLOC_CONF: "expandable_segments:True",
+      }
+    : {};
+
 export const vllm: ComputeEngineSpec = {
   id: "vllm",
   defaultBinary: "vllm",
@@ -82,5 +93,6 @@ export const vllm: ComputeEngineSpec = {
       health: health("/health", READY_DEADLINE_MS),
       listenPort: request.port,
       image: image(request.host),
+      env: environment(request.host),
     }),
 };

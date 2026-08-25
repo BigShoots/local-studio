@@ -211,7 +211,10 @@ export const recipeToLaunchInput = (
     engine: recipe.backend as EngineId,
     recipeId: recipe.id,
     runtime: dockerImage ? "docker" : "process",
-    deviceCount: devices.length,
+    deviceCount: Math.max(
+      devices.length,
+      recipe.tensor_parallel_size * recipe.pipeline_parallel_size,
+    ),
     ...(devices.length > 0 ? { devices } : {}),
     portOverride: recipe.port || config.inference_port,
     modelPath: recipe.model_path,

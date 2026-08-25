@@ -1,0 +1,6 @@
+FROM vllm/vllm-openai-xpu@sha256:f01e24f6c7ff01f1e0662234255a1372297d1dbd89d003cf13c8fad3eab1ba4f
+COPY patches/patch_mtp_nightly.py /opt/local-studio/patch_mtp.py
+COPY patches/patch_mtp_boundary.py /opt/local-studio/patch_boundary.py
+COPY patches/patch_draft_lmhead_int4.py /opt/local-studio/patch_draft_lmhead_int4.py
+COPY patches/patch_draft_mtp_int4.py /opt/local-studio/patch_draft_mtp_int4.py
+ENTRYPOINT ["bash", "-lc", "set -e; python /opt/local-studio/patch_mtp.py; python /opt/local-studio/patch_boundary.py; python /opt/local-studio/patch_draft_lmhead_int4.py; python /opt/local-studio/patch_draft_mtp_int4.py; exec vllm serve \"$@\"", "local-studio-vllm"]
