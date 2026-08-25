@@ -33,7 +33,8 @@ DATA_DIR="${LOCAL_STUDIO_DATA_DIR:-$DEFAULT_DATA_DIR}"
 MODELS_DIR="${LOCAL_STUDIO_MODELS_DIR:-$DATA_DIR/models}"
 HOST="${LOCAL_STUDIO_HOST:-0.0.0.0}"
 PORT="${LOCAL_STUDIO_PORT:-8080}"
-REPO="${LOCAL_STUDIO_REPO:-https://github.com/sybil-solutions/local-studio.git}"
+REPO="${LOCAL_STUDIO_REPO:-https://github.com/BigShoots/local-studio.git}"
+REF="${LOCAL_STUDIO_REF:-dev}"
 BUN="$HOME/.bun/bin/bun"
 
 log() { printf '[local-studio] %s\n' "$*"; }
@@ -57,7 +58,7 @@ elif [ -d "$DIR/controller" ]; then
   log "using existing non-git install at $DIR (left untouched)"
 else
   log "cloning into $DIR"
-  git clone --depth 1 "$REPO" "$DIR"
+  git clone --depth 1 --branch "$REF" "$REPO" "$DIR"
 fi
 
 log "installing controller dependencies…"
@@ -110,6 +111,13 @@ write_env_value LOCAL_STUDIO_HOST "$HOST"
 write_env_value LOCAL_STUDIO_PORT "$PORT"
 write_env_value LOCAL_STUDIO_DATA_DIR "$DATA_DIR"
 write_env_value LOCAL_STUDIO_MODELS_DIR "$MODELS_DIR"
+for pci_device in /sys/bus/pci/devices/*; do
+  if [ -r "$pci_device/vendor" ] && [ -r "$pci_device/device" ] &&
+    [ "$(cat "$pci_device/vendor")" = "0x8086" ] && [ "$(cat "$pci_device/device")" = "0xe223" ]; then
+    write_env_value LOCAL_STUDIO_GPU_SMI_TOOL intel-sysfs
+    break
+  fi
+done
 mkdir -p "$DATA_DIR" "$MODELS_DIR"
 
 # --- service -----------------------------------------------------------------

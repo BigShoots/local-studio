@@ -18,7 +18,7 @@ export interface ControllerDeployOptions {
 
 const MARKER = "LOCAL_STUDIO_CONTROLLER ";
 const INSTALL_SCRIPT_URL =
-  "https://raw.githubusercontent.com/sybil-solutions/local-studio/main/scripts/install-controller.sh";
+  "https://raw.githubusercontent.com/BigShoots/local-studio/dev/scripts/install-controller.sh";
 const DEPLOY_TIMEOUT_MS = 15 * 60_000;
 
 // "user@host" / "host" / tailnet names; conservative charset keeps the value
@@ -83,16 +83,24 @@ export const deployController = (
   ].join(" ");
 
   const localScript = findLocalInstallScript(resourcesPath);
+  const installOnThisMachine = host === "local" || host === "localhost" || host === "127.0.0.1";
   const remoteCommand = localScript
     ? `${envPrefix} bash -s`
     : `curl -fsSL ${INSTALL_SCRIPT_URL} | ${envPrefix} bash`;
 
   return new Promise((resolvePromise) => {
-    const child = spawn(
-      "ssh",
-      ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", host, remoteCommand],
-      { stdio: ["pipe", "pipe", "pipe"] },
-    );
+    const child = installOnThisMachine
+      ? spawn(localScript ? "bash" : "sh", localScript ? ["-s"] : ["-c", remoteCommand], {
+          stdio: ["pipe", "pipe", "pipe"],
+          env: {
+            ...process.env,
+            LOCAL_STUDIO_PORT: String(port),
+            ...(installDir ? { LOCAL_STUDIO_DIR: installDir } : {}),
+          },
+        })
+      : spawn("ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", host, remoteCommand], {
+          stdio: ["pipe", "pipe", "pipe"],
+        });
 
     if (localScript) {
       child.stdin.write(readFileSync(localScript, "utf8"));
@@ -140,7 +148,7 @@ export const deployController = (
       resolvePromise({
         ok: false,
         error:
-          code === 255
+          !installOnThisMachine && code === 255
             ? `ssh could not reach "${host}" (check the hostname and that key auth works)${stderrTail ? `: ${stderrTail.trim().split("\n").pop()}` : ""}`
             : `Installer exited with code ${code}${stderrTail ? `: ${stderrTail.trim().split("\n").pop()}` : ""}`,
       });

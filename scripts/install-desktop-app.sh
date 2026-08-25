@@ -2,6 +2,72 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  channel="stable"
+  keep_backup=1
+  for arg in "$@"; do
+    case "$arg" in
+      stable|dev) channel="$arg" ;;
+      --no-backup) keep_backup=0 ;;
+      *) echo "error: unknown argument $arg" >&2; exit 2 ;;
+    esac
+  done
+
+  install_root="${LOCAL_STUDIO_INSTALL_ROOT:-$HOME/.local/bin}"
+  applications_root="${LOCAL_STUDIO_APPLICATIONS_ROOT:-$HOME/.local/share/applications}"
+  icons_root="${LOCAL_STUDIO_ICONS_ROOT:-$HOME/.local/share/icons/hicolor/512x512/apps}"
+  rollback_root="${LOCAL_STUDIO_ROLLBACK_ROOT:-$HOME/.local/share/local-studio-installer/rollbacks}"
+  app_name="local-studio"
+  desktop_name="Local Studio"
+  output_root="$REPO_ROOT/frontend/dist-desktop"
+  if [[ "$channel" == "dev" ]]; then
+    app_name="local-studio-dev"
+    desktop_name="Local Studio Dev"
+    output_root="$REPO_ROOT/frontend/dist-desktop-dev"
+  fi
+
+  shopt -s nullglob
+  built_candidates=("$output_root"/Local-Studio-*-x64.AppImage)
+  shopt -u nullglob
+  built="${LOCAL_STUDIO_BUILT_APP:-${built_candidates[0]:-}}"
+  target="$install_root/$app_name"
+  rollback="$rollback_root/$app_name"
+
+  for directory in "$install_root" "$applications_root" "$icons_root" "$rollback_root"; do
+    if [[ "$directory" != /* || "$directory" == "/" ]]; then
+      echo "error: Linux install paths must be absolute directories below /" >&2
+      exit 2
+    fi
+  done
+  if [[ ! -f "$built" ]]; then
+    echo "error: no Linux AppImage found in $output_root" >&2
+    echo "       run: npm run desktop:dist:linux" >&2
+    exit 1
+  fi
+
+  mkdir -p "$install_root" "$applications_root" "$icons_root" "$rollback_root"
+  if [[ -f "$target" && "$keep_backup" == "1" ]]; then
+    mv -f "$target" "$rollback"
+  fi
+  install -m 0755 "$built" "$target"
+  install -m 0644 "$REPO_ROOT/frontend/public/icons/icon-512.png" "$icons_root/$app_name.png"
+  desktop_file="$applications_root/$app_name.desktop"
+  printf '%s\n' \
+    '[Desktop Entry]' \
+    'Type=Application' \
+    "Name=$desktop_name" \
+    "Exec=$target" \
+    "Icon=$app_name" \
+    'Categories=Development;' \
+    'Terminal=false' > "$desktop_file"
+  chmod 0644 "$desktop_file"
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$applications_root" >/dev/null 2>&1 || true
+  echo "==> installed $desktop_name at $target"
+  [[ "$keep_backup" == "1" && -f "$rollback" ]] && echo "==> previous AppImage saved at $rollback"
+  exit 0
+fi
+
 INSTALL_ROOT="${LOCAL_STUDIO_INSTALL_ROOT:-/Applications}"
 ROLLBACK_ROOT="${LOCAL_STUDIO_ROLLBACK_ROOT:-$HOME/Library/Application Support/Local Studio Installer/Rollbacks}"
 LSREGISTER="${LOCAL_STUDIO_LSREGISTER:-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister}"

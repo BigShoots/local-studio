@@ -30,6 +30,7 @@ const spelling: Spelling = {
 const image = (host: HostProfile): string | null => {
   if (host.accelerator === "rocm") return "rocm/vllm:latest";
   if (host.accelerator === "cuda") return "vllm/vllm-openai:latest";
+  if (host.accelerator === "xpu") return "vllm/vllm-openai-xpu:latest-x86_64";
   return null;
 };
 
@@ -44,8 +45,15 @@ const supports = (host: HostProfile): EngineSupport => {
       ? supported("docker")
       : unsupported("vLLM on ROCm needs Docker with GPU passthrough (rocm/vllm)");
   }
+  if (host.accelerator === "xpu") {
+    return host.dockerGpu
+      ? supported("docker")
+      : unsupported("vLLM on Intel XPU needs Docker with access to /dev/dri");
+  }
   if (host.accelerator !== "cuda") {
-    return unsupported(`vLLM needs a CUDA or ROCm device; this host reports ${host.accelerator}`);
+    return unsupported(
+      `vLLM needs a CUDA, ROCm, or Intel XPU device; this host reports ${host.accelerator}`,
+    );
   }
   return host.dockerGpu ? supported("process", "docker") : supported("process");
 };

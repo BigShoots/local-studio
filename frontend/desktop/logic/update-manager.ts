@@ -56,10 +56,10 @@ function ensureFeedConfigured(): { ok: true; url: string } {
   // signature against the running app before installing.
   autoUpdater.setFeedURL({
     provider: "github",
-    owner: "sybil-solutions",
+    owner: "BigShoots",
     repo: "local-studio",
   });
-  return { ok: true, url: "github:sybil-solutions/local-studio" };
+  return { ok: true, url: "github:BigShoots/local-studio" };
 }
 
 export function getUpdateState(): DesktopUpdateSnapshot {

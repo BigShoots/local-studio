@@ -5,7 +5,7 @@
   "description": "Local-first workstation for running self-hosted LLMs",
   "author": "Sybil Solutions",
   "homepage": "https://localstudio.ai",
-  "repository": "https://github.com/sybil-solutions/local-studio",
+  "repository": "https://github.com/BigShoots/local-studio",
   "scripts": {
     "predev": "node ../scripts/project.mjs link-services",
     "dev": "concurrently -k -n NEXT,AGENT -c cyan,green \"next dev\" \"npm --prefix ../services/agent-runtime run dev\"",
@@ -31,6 +31,7 @@
     "desktop:build": "npm run build && npm run desktop:build:main",
     "desktop:dev": "npm run desktop:build:main && concurrently -k -n NEXT,ELECTRON -c cyan,magenta \"npm run dev\" \"node -e \\\"setTimeout(() => process.exit(0), 3000)\\\" && npm run desktop:start:dev\"",
     "desktop:dist": "npm run desktop:build && electron-builder --config desktop/electron-builder.yml",
+    "desktop:dist:linux": "npm run desktop:build && electron-builder --linux AppImage --x64 --config desktop/electron-builder.yml",
     "desktop:dist:dev": "npm run desktop:build && electron-builder --config desktop/electron-builder.yml --config.appId=org.local.studio.desktop.dev --config.productName=\"Local Studio Dev\" --config.extraMetadata.localStudioChannel=dev --config.directories.output=dist-desktop-dev",
     "desktop:dist:notarized": "npm run desktop:build && electron-builder --config desktop/electron-builder.yml --config.mac.notarize=true",
     "desktop:pack": "npm run desktop:build && electron-builder --dir --config desktop/electron-builder.yml",

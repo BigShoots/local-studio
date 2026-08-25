@@ -28,6 +28,7 @@
     "dev:agent-runtime": "npm --prefix services/agent-runtime run build && node services/agent-runtime/dist/server.js",
     "desktop:build": "cd frontend && npm run desktop:build",
     "desktop:dist": "cd frontend && npm run desktop:dist",
+    "desktop:dist:linux": "cd frontend && npm run desktop:dist:linux",
     "desktop:pack": "cd frontend && npm run desktop:pack"
   }
 }

@@ -85,7 +85,7 @@ export interface EngineJob {
   error?: string;
 }
 
-export type RuntimePlatformKind = "cuda" | "rocm" | "metal" | "unknown";
+export type RuntimePlatformKind = "cuda" | "rocm" | "xpu" | "metal" | "unknown";
 
 export type RuntimeRocmSmiTool = "amd-smi" | "rocm-smi";
 
@@ -117,7 +117,7 @@ export interface RuntimeTorchBuildInfo {
 
 export interface RuntimePlatformInfo {
   kind: RuntimePlatformKind;
-  vendor: "nvidia" | "amd" | "apple" | null;
+  vendor: "nvidia" | "amd" | "intel" | "apple" | null;
   rocm: RuntimeRocmInfo | null;
   torch: RuntimeTorchBuildInfo;
 }

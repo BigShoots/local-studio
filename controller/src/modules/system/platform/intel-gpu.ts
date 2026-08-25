@@ -14,6 +14,8 @@ type IntelPciGpu = {
 
 const PCI_DEVICES_DIR = "/sys/bus/pci/devices";
 const DRM_DIR = "/sys/class/drm";
+const ARC_PRO_B70_DEVICE_ID = "0xe223";
+const ARC_PRO_B70_MEMORY_MB = 32_656;
 
 const readText = (path: string): string | null => {
   try {
@@ -40,7 +42,7 @@ const readDeviceDriver = (devicePath: string): string | null => {
 
 const isIntelComputeGpu = (gpu: IntelPciGpu): boolean => {
   if (gpu.driver === "xe") return true;
-  if (gpu.deviceId.toLowerCase() === "0xe223") return true;
+  if (gpu.deviceId.toLowerCase() === ARC_PRO_B70_DEVICE_ID) return true;
   return gpu.classCode.toLowerCase().startsWith("0x03");
 };
 
@@ -111,6 +113,9 @@ const readHwmonMetric = (hwmonPaths: string[], fileName: string): number | null 
   readFirstNumber(hwmonPaths.map((path) => join(path, fileName)));
 
 const readIntelName = (gpu: IntelPciGpu): Effect.Effect<string> => {
+  if (gpu.deviceId.toLowerCase() === ARC_PRO_B70_DEVICE_ID) {
+    return Effect.succeed("Intel Arc Pro B70");
+  }
   const lspci = resolveBinary("lspci");
   if (lspci) {
     return runCommandAsyncEffect(lspci, ["-s", gpu.address.replace(/^0000:/, "")], {
@@ -121,14 +126,12 @@ const readIntelName = (gpu: IntelPciGpu): Effect.Effect<string> => {
           const name = result.stdout.replace(/^[0-9a-f:.]+\s+/i, "").trim();
           if (name) return name;
         }
-        return gpu.deviceId.toLowerCase() === "0xe223" ? "Intel Arc Pro B70" : "Intel Arc GPU";
+        return "Intel Arc GPU";
       }),
     );
   }
 
-  return Effect.succeed(
-    gpu.deviceId.toLowerCase() === "0xe223" ? "Intel Arc Pro B70" : "Intel Arc GPU",
-  );
+  return Effect.succeed("Intel Arc GPU");
 };
 
 export const getGpuInfoFromIntelSysfs = (): Effect.Effect<GpuInfo[]> =>
@@ -137,10 +140,18 @@ export const getGpuInfoFromIntelSysfs = (): Effect.Effect<GpuInfo[]> =>
       Effect.forEach(gpus, (gpu, index) =>
         Effect.gen(function* () {
           const drmDevicePaths = findDrmDevicePaths(gpu.path);
+          const reportedMemoryTotal = readFirstNumber(
+            drmDevicePaths.map((path) => join(path, "mem_info_vram_total")),
+          );
+          const reportedMemoryUsed = readFirstNumber(
+            drmDevicePaths.map((path) => join(path, "mem_info_vram_used")),
+          );
           const memoryTotal =
-            readFirstNumber(drmDevicePaths.map((path) => join(path, "mem_info_vram_total"))) ?? 0;
-          const memoryUsed =
-            readFirstNumber(drmDevicePaths.map((path) => join(path, "mem_info_vram_used"))) ?? 0;
+            reportedMemoryTotal ??
+            (gpu.deviceId.toLowerCase() === ARC_PRO_B70_DEVICE_ID
+              ? ARC_PRO_B70_MEMORY_MB * 1024 * 1024
+              : 0);
+          const memoryUsed = reportedMemoryUsed ?? 0;
           const memoryFree = Math.max(0, memoryTotal - memoryUsed);
           const hwmonPaths = findHwmonPaths(gpu.path);
           const temperature = Math.round((readHwmonMetric(hwmonPaths, "temp1_input") ?? 0) / 1000);
@@ -158,6 +169,8 @@ export const getGpuInfoFromIntelSysfs = (): Effect.Effect<GpuInfo[]> =>
             memory_total_mb: toMb(memoryTotal),
             memory_used_mb: toMb(memoryUsed),
             memory_free_mb: toMb(memoryFree),
+            memory_usage_available:
+              reportedMemoryTotal !== null && reportedMemoryUsed !== null,
             utilization_pct: 0,
             temp_c: temperature,
             power_draw: powerDraw,

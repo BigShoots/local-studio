@@ -115,13 +115,24 @@ const computeSystemRuntimeInfo = (
       torch,
       hasNvidiaSmi,
       hasRocmSmi,
+      hasIntelGpu:
+        forcedSmiTool?.trim() === "intel-sysfs" ||
+        (!hasNvidiaSmi && !hasRocmSmi && operatingSystem() === "linux" && detectedGpus.length > 0),
       isAppleSilicon: operatingSystem() === "darwin" && arch() === "arm64",
     });
     const rocm = kind === "rocm" ? yield* getRocmInfo(rocmSmiTool) : null;
     const platform: RuntimePlatformInfo = {
       kind,
       vendor:
-        kind === "cuda" ? "nvidia" : kind === "rocm" ? "amd" : kind === "metal" ? "apple" : null,
+        kind === "cuda"
+          ? "nvidia"
+          : kind === "rocm"
+            ? "amd"
+            : kind === "xpu"
+              ? "intel"
+              : kind === "metal"
+                ? "apple"
+                : null,
       rocm,
       torch,
     };
@@ -130,8 +141,8 @@ const computeSystemRuntimeInfo = (
         kind === "metal"
           ? Effect.succeed({ available: false, tool: "apple-metal" as const })
           : kind === "cuda" && nvidiaSnapshot
-          ? Effect.succeed({ available: nvidiaSnapshot.available, tool: "nvidia-smi" as const })
-          : probeGpuMonitoring(kind, rocmSmiTool),
+            ? Effect.succeed({ available: nvidiaSnapshot.available, tool: "nvidia-smi" as const })
+            : probeGpuMonitoring(kind, rocmSmiTool),
         kind === "cuda"
           ? getCudaInfo(nvidiaSnapshot?.driverVersion ?? null)
           : Effect.succeed({
@@ -167,15 +178,18 @@ export const detectPlatformKind = (args: {
   torch: RuntimeTorchBuildInfo;
   hasNvidiaSmi: boolean;
   hasRocmSmi: boolean;
+  hasIntelGpu: boolean;
   isAppleSilicon?: boolean;
 }): RuntimePlatformKind => {
   const forced = args.forcedSmiTool?.trim();
   if (forced === "nvidia-smi") return "cuda";
   if (forced === "amd-smi" || forced === "rocm-smi") return "rocm";
+  if (forced === "intel-sysfs") return "xpu";
   if (args.torch.torch_hip) return "rocm";
   if (args.torch.torch_cuda) return "cuda";
   if (args.hasNvidiaSmi) return "cuda";
   if (args.hasRocmSmi) return "rocm";
+  if (args.hasIntelGpu) return "xpu";
   if (args.isAppleSilicon) return "metal";
   return "unknown";
 };

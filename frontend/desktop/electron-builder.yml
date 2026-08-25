@@ -138,5 +138,10 @@ win:
         - x64
 
 linux:
+  icon: public/icons/icon-512.png
+  category: Development
+  artifactName: Local-Studio-${version}-${arch}.${ext}
   target:
-    - AppImage
+    - target: AppImage
+      arch:
+        - x64

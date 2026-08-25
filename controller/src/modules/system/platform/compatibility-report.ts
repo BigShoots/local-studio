@@ -9,6 +9,7 @@ import type {
 import { Effect } from "effect";
 import { runCommandAsyncEffect } from "../../../core/command";
 import { resolveAmdSmiBinary, resolveNvidiaSmiBinary, resolveRocmSmiBinary } from "./smi-tools";
+import { getGpuInfoFromIntelSysfs } from "./intel-gpu";
 
 const toEvidence = (lines: Array<string | null | undefined>): string | null => {
   const filtered = lines.filter((line): line is string => Boolean(line && line.trim()));
@@ -77,6 +78,12 @@ export const probeGpuMonitoring = (
     });
   }
 
+  if (kind === "xpu") {
+    return getGpuInfoFromIntelSysfs().pipe(
+      Effect.map((gpus) => ({ available: gpus.length > 0, tool: "intel-sysfs" as const })),
+    );
+  }
+
   return Effect.succeed({ available: false, tool: null });
 };
 
@@ -105,7 +112,9 @@ export const buildCompatibilityReport = (args: {
           ? "Verify ROCm is installed and GPU tools are available (amd-smi/rocm-smi)."
           : runtime.platform.kind === "cuda"
             ? "Verify NVIDIA drivers are installed and nvidia-smi is accessible."
-            : "Verify GPU drivers are installed and set LOCAL_STUDIO_GPU_SMI_TOOL if needed.",
+            : runtime.platform.kind === "xpu"
+              ? "Verify the Intel Xe driver is loaded and /dev/dri is accessible."
+              : "Verify GPU drivers are installed and set LOCAL_STUDIO_GPU_SMI_TOOL if needed.",
     });
   }
 
@@ -144,6 +153,17 @@ export const buildCompatibilityReport = (args: {
       evidence: toEvidence([`tool=${gpuMonitoring.tool ?? "nvidia-smi"}`]),
       suggested_fix:
         "Ensure NVIDIA drivers are installed and nvidia-smi is on PATH (snap-installed bun can block access).",
+    });
+  }
+
+  if (runtime.platform.kind === "xpu" && !gpuMonitoring.available) {
+    addCheck(checks, {
+      id: "gpu-monitoring.xpu-unavailable",
+      severity: "warn",
+      message: "Intel XPU detected, but GPU telemetry is not accessible.",
+      evidence: toEvidence([`tool=${gpuMonitoring.tool ?? "intel-sysfs"}`]),
+      suggested_fix:
+        "Ensure the Xe driver is loaded and the controller can read /sys and /dev/dri.",
     });
   }
 

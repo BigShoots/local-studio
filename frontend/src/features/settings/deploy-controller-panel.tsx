@@ -77,13 +77,13 @@ export function DeployControllerPanel({
   return (
     <SettingsGroup
       title="Deploy a controller"
-      description="Install and start a controller on another machine over ssh (key auth). It appears in your list when it's healthy."
+      description="Enter local to install on this machine, or deploy to another machine over ssh with key authentication."
     >
       <div className="flex flex-wrap items-center gap-2 px-4 py-3.5">
         <input
           value={host}
           onChange={(event) => setHost(event.target.value)}
-          placeholder="user@hostname (ssh)"
+          placeholder="local or user@hostname"
           spellCheck={false}
           className="min-w-60 flex-1 border border-(--border) bg-transparent px-2 py-1 text-[length:var(--fs-md)] font-mono outline-none focus:border-(--accent)"
         />
