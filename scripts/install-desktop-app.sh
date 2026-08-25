@@ -59,10 +59,12 @@ if [[ "$(uname -s)" == "Linux" ]]; then
     "Name=$desktop_name" \
     "Exec=env -u ELECTRON_RUN_AS_NODE APPIMAGE_EXTRACT_AND_RUN=1 $target" \
     "Icon=$app_name" \
+    'StartupWMClass=Local Studio' \
     'Categories=Development;' \
     'Terminal=false' > "$desktop_file"
   chmod 0644 "$desktop_file"
   command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$applications_root" >/dev/null 2>&1 || true
+  command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
   echo "==> installed $desktop_name at $target"
   [[ "$keep_backup" == "1" && -f "$rollback" ]] && echo "==> previous AppImage saved at $rollback"
   exit 0

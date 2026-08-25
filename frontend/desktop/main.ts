@@ -47,6 +47,7 @@ import {
   resizePty,
   writePty,
 } from "./logic/pty-manager";
+import { startLocalController } from "./logic/local-controller";
 
 let appState: DesktopAppState = "starting";
 let mainWindow: BrowserWindow | null = null;
@@ -85,6 +86,14 @@ async function processMemorySummary(): Promise<string> {
 }
 
 async function bootstrap(): Promise<void> {
+  const localController = await startLocalController();
+  if (process.platform === "linux") {
+    if (localController) {
+      log.info(`Local controller ready (${localController.service}, ${localController.url})`);
+    } else {
+      log.warn("No installed Linux controller service was found");
+    }
+  }
   if (!frontendServer) {
     frontendServer = await startFrontendServer({ onExit: handleFrontendServerExit });
     registerNavigationPolicy(new URL(frontendServer.runtime.url).origin);

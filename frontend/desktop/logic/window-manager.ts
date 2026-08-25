@@ -14,6 +14,19 @@ async function memorySummary(): Promise<string> {
 }
 
 export function createMainWindow(appUrl: string): BrowserWindow {
+  const icon = app.isPackaged
+    ? path.join(
+        process.resourcesPath,
+        "app",
+        "frontend",
+        ".next",
+        "standalone",
+        "frontend",
+        "public",
+        "icons",
+        "icon-512.png",
+      )
+    : path.resolve(app.getAppPath(), "public", "icons", "icon-512.png");
   const window = new BrowserWindow({
     width: DESKTOP_CONFIG.preferredWindow.width,
     height: DESKTOP_CONFIG.preferredWindow.height,
@@ -22,6 +35,7 @@ export function createMainWindow(appUrl: string): BrowserWindow {
     backgroundColor: "#0b0f14",
     show: false,
     title: DESKTOP_CONFIG.appName,
+    icon,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(app.getAppPath(), "desktop", "dist", "preload.js"),
