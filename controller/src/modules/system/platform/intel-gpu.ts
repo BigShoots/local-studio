@@ -12,10 +12,24 @@ type IntelPciGpu = {
   driver: string | null;
 };
 
+type IntelXpuSmiStats = {
+  memoryTotalMb: number | null;
+  memoryUsedMb: number | null;
+  powerDraw: number | null;
+};
+
+type CounterSample = {
+  at: number;
+  value: number;
+};
+
 const PCI_DEVICES_DIR = "/sys/bus/pci/devices";
 const DRM_DIR = "/sys/class/drm";
 const ARC_PRO_B70_DEVICE_ID = "0xe223";
 const ARC_PRO_B70_MEMORY_MB = 32_656;
+const INTEL_CONTAINER_NAME = "local-studio-llm";
+const utilizationSamples = new Map<string, CounterSample>();
+const energySamples = new Map<string, CounterSample>();
 
 const readText = (path: string): string | null => {
   try {
@@ -112,6 +126,116 @@ const findHwmonPaths = (pciPath: string): string[] => {
 const readHwmonMetric = (hwmonPaths: string[], fileName: string): number | null =>
   readFirstNumber(hwmonPaths.map((path) => join(path, fileName)));
 
+const readLabeledHwmonMetric = (
+  hwmonPaths: string[],
+  metric: string,
+  labels: readonly string[],
+): number | null => {
+  for (const hwmonPath of hwmonPaths) {
+    let entries: string[];
+    try {
+      entries = readdirSync(hwmonPath);
+    } catch {
+      continue;
+    }
+    for (const entry of entries.filter((name) => new RegExp(`^${metric}\\d+_label$`).test(name))) {
+      const label = readText(join(hwmonPath, entry))?.toLowerCase();
+      if (!label || !labels.includes(label)) continue;
+      const input = entry.replace(/_label$/, "_input");
+      const value = readNumber(join(hwmonPath, input));
+      if (value !== null) return value;
+    }
+  }
+  return null;
+};
+
+const readFirstHwmonInput = (hwmonPaths: string[], metric: string): number | null => {
+  for (const hwmonPath of hwmonPaths) {
+    let entries: string[];
+    try {
+      entries = readdirSync(hwmonPath).sort();
+    } catch {
+      continue;
+    }
+    for (const entry of entries.filter((name) => new RegExp(`^${metric}\\d+_input$`).test(name))) {
+      const value = readNumber(join(hwmonPath, entry));
+      if (value !== null) return value;
+    }
+  }
+  return null;
+};
+
+const sampledRate = (
+  samples: Map<string, CounterSample>,
+  key: string,
+  value: number | null,
+): { elapsedMs: number; valueDelta: number } | null => {
+  if (value === null) return null;
+  const at = Date.now();
+  const previous = samples.get(key);
+  samples.set(key, { at, value });
+  if (!previous || at <= previous.at || value < previous.value) return null;
+  return { elapsedMs: at - previous.at, valueDelta: value - previous.value };
+};
+
+const readUtilization = (gpu: IntelPciGpu): { available: boolean; value: number } => {
+  const idle = readNumber(join(gpu.path, "tile0", "gt0", "gtidle", "idle_residency_ms"));
+  const rate = sampledRate(utilizationSamples, gpu.address, idle);
+  if (idle === null) return { available: false, value: 0 };
+  if (!rate || rate.elapsedMs < 50) return { available: true, value: 0 };
+  const busyFraction = 1 - rate.valueDelta / rate.elapsedMs;
+  return {
+    available: true,
+    value: Math.round(Math.max(0, Math.min(1, busyFraction)) * 100),
+  };
+};
+
+const readPowerFromEnergy = (hwmonPaths: string[], key: string): number | null => {
+  const energy = readHwmonMetric(hwmonPaths, "energy1_input");
+  const rate = sampledRate(energySamples, key, energy);
+  if (!rate || rate.elapsedMs < 50) return null;
+  return Number((rate.valueDelta / rate.elapsedMs / 1000).toFixed(1));
+};
+
+const nullableNumber = (value: string | undefined): number | null => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const readIntelXpuSmiStats = (index: number): Effect.Effect<IntelXpuSmiStats | null> => {
+  const docker = resolveBinary("docker");
+  if (!docker) return Effect.succeed(null);
+  return runCommandAsyncEffect(
+    docker,
+    [
+      "exec",
+      INTEL_CONTAINER_NAME,
+      "xpu-smi",
+      "--query-gpu=power.draw,memory.used,memory.total",
+      `--id=${index}`,
+      "--format=csv,noheader,nounits",
+    ],
+    { timeoutMs: 2_000, maxOutputBytes: 16_384 },
+  ).pipe(
+    Effect.map((result) => {
+      if (result.status !== 0) return null;
+      const values = result.stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .reverse()
+        .map((line) => line.split(",").map((value) => value.trim()))
+        .find((parts) => parts.length === 3);
+      if (!values) return null;
+      return {
+        powerDraw: nullableNumber(values[0]),
+        memoryUsedMb: nullableNumber(values[1]),
+        memoryTotalMb: nullableNumber(values[2]),
+      };
+    }),
+  );
+};
+
 const readIntelName = (gpu: IntelPciGpu): Effect.Effect<string> => {
   if (gpu.deviceId.toLowerCase() === ARC_PRO_B70_DEVICE_ID) {
     return Effect.succeed("Intel Arc Pro B70");
@@ -140,27 +264,45 @@ export const getGpuInfoFromIntelSysfs = (): Effect.Effect<GpuInfo[]> =>
       Effect.forEach(gpus, (gpu, index) =>
         Effect.gen(function* () {
           const drmDevicePaths = findDrmDevicePaths(gpu.path);
+          const xpuSmiStats = yield* readIntelXpuSmiStats(index);
           const reportedMemoryTotal = readFirstNumber(
             drmDevicePaths.map((path) => join(path, "mem_info_vram_total")),
           );
           const reportedMemoryUsed = readFirstNumber(
             drmDevicePaths.map((path) => join(path, "mem_info_vram_used")),
           );
+          const smiMemoryTotal =
+            xpuSmiStats?.memoryTotalMb !== null && xpuSmiStats?.memoryTotalMb !== undefined
+              ? xpuSmiStats.memoryTotalMb * 1024 * 1024
+              : null;
+          const smiMemoryUsed =
+            xpuSmiStats?.memoryUsedMb !== null && xpuSmiStats?.memoryUsedMb !== undefined
+              ? xpuSmiStats.memoryUsedMb * 1024 * 1024
+              : null;
           const memoryTotal =
             reportedMemoryTotal ??
+            smiMemoryTotal ??
             (gpu.deviceId.toLowerCase() === ARC_PRO_B70_DEVICE_ID
               ? ARC_PRO_B70_MEMORY_MB * 1024 * 1024
               : 0);
-          const memoryUsed = reportedMemoryUsed ?? 0;
+          const memoryUsed = reportedMemoryUsed ?? smiMemoryUsed ?? 0;
           const memoryFree = Math.max(0, memoryTotal - memoryUsed);
           const hwmonPaths = findHwmonPaths(gpu.path);
-          const temperature = Math.round((readHwmonMetric(hwmonPaths, "temp1_input") ?? 0) / 1000);
-          const powerDraw = Number(
-            ((readHwmonMetric(hwmonPaths, "power1_input") ?? 0) / 1_000_000).toFixed(1),
-          );
+          const temperatureInput =
+            readLabeledHwmonMetric(hwmonPaths, "temp", ["pkg", "gpu", "card"]) ??
+            readFirstHwmonInput(hwmonPaths, "temp");
+          const temperature = Math.round((temperatureInput ?? 0) / 1000);
+          const powerInput = readHwmonMetric(hwmonPaths, "power1_input");
+          const sampledPower = readPowerFromEnergy(hwmonPaths, gpu.address);
+          const powerDraw =
+            xpuSmiStats?.powerDraw ??
+            (powerInput !== null
+              ? Number((powerInput / 1_000_000).toFixed(1))
+              : (sampledPower ?? 0));
           const powerLimit = Number(
             ((readHwmonMetric(hwmonPaths, "power1_cap") ?? 0) / 1_000_000).toFixed(1),
           );
+          const utilization = readUtilization(gpu);
           const toMb = (bytes: number): number => Math.max(0, Math.round(bytes / 1024 / 1024));
 
           return {
@@ -170,11 +312,18 @@ export const getGpuInfoFromIntelSysfs = (): Effect.Effect<GpuInfo[]> =>
             memory_used_mb: toMb(memoryUsed),
             memory_free_mb: toMb(memoryFree),
             memory_usage_available:
-              reportedMemoryTotal !== null && reportedMemoryUsed !== null,
-            utilization_pct: 0,
+              (reportedMemoryTotal !== null && reportedMemoryUsed !== null) ||
+              (smiMemoryTotal !== null && smiMemoryUsed !== null),
+            utilization_pct: utilization.value,
+            utilization_available: utilization.available,
             temp_c: temperature,
+            temperature_available: temperatureInput !== null,
             power_draw: powerDraw,
             power_limit: powerLimit,
+            power_available:
+              typeof xpuSmiStats?.powerDraw === "number" ||
+              powerInput !== null ||
+              sampledPower !== null,
           };
         }),
       ),
