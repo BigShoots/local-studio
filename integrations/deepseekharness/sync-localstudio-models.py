@@ -18,7 +18,8 @@ PROVIDER = "localstudio"
 
 def pretty_name(value: str) -> str:
     name = value.replace("@", " ").replace("-", " ").replace("_", " ")
-    return f"{re.sub(r'\s+', ' ', name).strip()} (Local Studio)"
+    normalized = re.sub(r"\s+", " ", name).strip()
+    return f"{normalized} (Local Studio)"
 
 
 def fetch_models() -> list[dict[str, object]] | None:
