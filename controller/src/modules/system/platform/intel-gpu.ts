@@ -264,7 +264,18 @@ export const getGpuInfoFromIntelSysfs = (): Effect.Effect<GpuInfo[]> =>
       Effect.forEach(gpus, (gpu, index) =>
         Effect.gen(function* () {
           const drmDevicePaths = findDrmDevicePaths(gpu.path);
-          const xpuSmiStats = yield* readIntelXpuSmiStats(index);
+          const xpuOrdinal = gpus
+            .slice(0, index + 1)
+            .filter(
+              (candidate) =>
+                candidate.driver === "xe" ||
+                candidate.deviceId.toLowerCase() === ARC_PRO_B70_DEVICE_ID,
+            ).length - 1;
+          const isXpuDevice =
+            gpu.driver === "xe" || gpu.deviceId.toLowerCase() === ARC_PRO_B70_DEVICE_ID;
+          const xpuSmiStats = isXpuDevice
+            ? yield* readIntelXpuSmiStats(xpuOrdinal)
+            : null;
           const reportedMemoryTotal = readFirstNumber(
             drmDevicePaths.map((path) => join(path, "mem_info_vram_total")),
           );
