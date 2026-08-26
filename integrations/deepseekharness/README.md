@@ -11,6 +11,9 @@ automatic model-switch behavior as the existing LM Studio integration.
   recipe and evicts any other Local Studio model.
 - `localstudio_api.py` loads the controller key from the environment or the
   controller `.env` file without copying that key into DeepSeekHarness.
+- `patch-dsh-zero-usage.py` prevents failed retry records with zero usage from
+  replacing the last valid context-pressure sample. Run it before DSH starts
+  so the patch is reapplied after package upgrades.
 
 The provider entry should use `http://127.0.0.1:1236/v1`, the OpenAI
 completions API, and `max_completion_tokens`. Give the provider a fixed local
