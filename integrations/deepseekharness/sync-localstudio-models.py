@@ -14,6 +14,13 @@ from localstudio_api import request_json
 DSH = Path(os.environ.get("DSH_HOME", Path.home() / ".dsh"))
 SETTINGS = DSH / "settings.yaml"
 PROVIDER = "localstudio"
+QWEN38_RE = re.compile(r"qwen3[._-]?8", re.I)
+QWEN38_REASONING_EFFORTS = {
+    "off": "none",
+    "low": "low",
+    "medium": "medium",
+    "xhigh": "xhigh",
+}
 
 
 def pretty_name(value: str) -> str:
@@ -54,6 +61,13 @@ def fetch_models() -> list[dict[str, object]] | None:
             model["input"] = ["text", "image"]
         else:
             model["input"] = ["text"]
+        identity = " ".join(
+            value
+            for value in (model_id, recipe_id, recipe_name)
+            if isinstance(value, str)
+        )
+        if QWEN38_RE.search(identity):
+            model["reasoningEfforts"] = dict(QWEN38_REASONING_EFFORTS)
         models.append(model)
     return models
 
@@ -76,6 +90,14 @@ def existing_models(text: str) -> dict[str, dict[str, object]]:
             continue
         field = re.match(r"          (name|contextWindow|maxTokens|input):\s*(.+)\s*$", line)
         if not field:
+            effort = re.match(
+                r'            "?((?:off|minimal|low|medium|high|xhigh|max))"?\s*:\s*(.*)\s*$',
+                line,
+            )
+            if effort:
+                current.setdefault("reasoningEfforts", {})[effort.group(1)] = (
+                    effort.group(2) or None
+                )
             continue
         key, raw = field.group(1), field.group(2).strip()
         if key == "name":
@@ -97,7 +119,7 @@ def merged_models(
     for model in discovered:
         old = previous.get(str(model["id"]), {})
         row = {"id": model["id"], "name": old.get("name") or model.get("name")}
-        for key in ("contextWindow", "maxTokens", "input"):
+        for key in ("contextWindow", "maxTokens", "input", "reasoningEfforts"):
             if key in model:
                 row[key] = model[key]
             elif key in old:
@@ -121,6 +143,13 @@ def render_models(models: list[dict[str, object]]) -> str:
         inputs = model.get("input")
         if isinstance(inputs, list) and inputs:
             lines.append(f"          input: [ {', '.join(str(value) for value in inputs)} ]")
+        reasoning_efforts = model.get("reasoningEfforts")
+        if isinstance(reasoning_efforts, dict) and reasoning_efforts:
+            lines.append("          reasoningEfforts:")
+            for level, wire_value in reasoning_efforts.items():
+                key = f'"{level}"' if level == "off" else level
+                suffix = "" if wire_value is None else f" {wire_value}"
+                lines.append(f"            {key}:{suffix}")
     return "\n".join(lines) + "\n"
 
 
@@ -155,6 +184,16 @@ def sync_once() -> bool:
     return False
 
 
+def model_signature(model: dict[str, object]) -> tuple[object, ...]:
+    reasoning_efforts = model.get("reasoningEfforts")
+    return (
+        model.get("id"),
+        model.get("contextWindow"),
+        tuple(model.get("input", [])) if isinstance(model.get("input"), list) else (),
+        tuple(reasoning_efforts.items()) if isinstance(reasoning_efforts, dict) else (),
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--watch", action="store_true")
@@ -169,10 +208,7 @@ def main() -> int:
         models = fetch_models()
         if models is None:
             continue
-        current_signature = tuple(
-            (model.get("id"), model.get("contextWindow"), tuple(model.get("input", [])))
-            for model in models
-        )
+        current_signature = tuple(model_signature(model) for model in models)
         if current_signature == signature:
             continue
         signature = current_signature
