@@ -55,12 +55,12 @@ function canonicalNvidiaUuid(uuid: string): string {
   return `GPU-${uuid.slice(4).toLowerCase()}`;
 }
 
-function selectableDeviceId(gpu: GpuInfo): string | null {
+function selectableDeviceId(gpu: GpuInfo, intelOrdinal: number | null): string | null {
   const uuid = gpu.uuid?.trim();
   if (uuid && fullNvidiaUuid.test(uuid)) return canonicalNvidiaUuid(uuid);
   const pciBusId = gpu.pci_bus_id?.trim();
   if (pciBusId) return pciBusId;
-  if (/intel/i.test(gpu.name)) return `intel:${gpu.index}`;
+  if (intelOrdinal !== null) return `intel:${intelOrdinal}`;
   return null;
 }
 
@@ -75,8 +75,13 @@ export function resolveRecipeGpuUuids(
   const byIndex = new Map<number, string>();
   const byUuid = new Map<string, string>();
   const allUuids: string[] = [];
+  let intelOrdinal = 0;
   for (const gpu of gpus) {
-    const uuid = selectableDeviceId(gpu);
+    // Intel's sysfs inventory can include an iGPU that Level Zero does not expose.
+    // Assign XPU ordinals only to compute-capable cards with known device memory so
+    // a physical selector such as GPU 1 can still become level_zero:0.
+    const isSelectableIntel = /intel/i.test(gpu.name) && gpu.memory_total_mb > 0;
+    const uuid = selectableDeviceId(gpu, isSelectableIntel ? intelOrdinal++ : null);
     if (!uuid) continue;
     if (!byIndex.has(gpu.index)) byIndex.set(gpu.index, uuid);
     byUuid.set(uuid.toLowerCase(), uuid);
