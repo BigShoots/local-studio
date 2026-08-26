@@ -48,20 +48,41 @@ def patch(path: Path) -> bool:
     return True
 
 
+def default_roots() -> list[Path]:
+    home = Path.home()
+    roots = [
+        home
+        / ".npm-global/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai",
+        home / ".dsh/profiles/node_modules/@deepseek-ai",
+    ]
+    roots.extend((home / ".dsh/profiles").glob("*/node_modules/@deepseek-ai"))
+    return roots
+
+
+def targets(roots: list[Path]) -> list[Path]:
+    found: list[Path] = []
+    for root in roots:
+        candidates = [
+            root / "dsh-token-meter/lib/index.js",
+            root / "dsh/node_modules/@deepseek-ai/dsh-token-meter/lib/index.js",
+        ]
+        for candidate in candidates:
+            if candidate.is_file() and candidate not in found:
+                found.append(candidate)
+    return found
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "root",
-        nargs="?",
-        default=str(
-            Path.home()
-            / ".npm-global/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai"
-        ),
-    )
+    parser.add_argument("roots", nargs="*")
     args = parser.parse_args()
-    target = Path(args.root) / "dsh-token-meter/lib/index.js"
-    changed = patch(target)
-    print(f"dsh-zero-usage: {'patched' if changed else 'already current'} {target}")
+    roots = [Path(value) for value in args.roots] if args.roots else default_roots()
+    found = targets(roots)
+    if not found:
+        raise RuntimeError("no DSH token-meter installation found")
+    for target in found:
+        changed = patch(target)
+        print(f"dsh-zero-usage: {'patched' if changed else 'already current'} {target}")
     return 0
 
 
