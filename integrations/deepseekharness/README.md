@@ -14,6 +14,10 @@ automatic model-switch behavior as the existing LM Studio integration.
 - `patch-dsh-zero-usage.py` prevents failed retry records with zero usage from
   replacing the last valid context-pressure sample. Run it before DSH starts
   so the patch is reapplied after package upgrades.
+- `patch-dsh-lan-directory-picker.py` allows a trusted LAN client to invoke
+  the server's native workspace folder picker while other host RPC methods
+  remain loopback-only. Run it before DSH starts so package upgrades retain
+  the workspace picker exception.
 
 The provider entry should use `http://127.0.0.1:1236/v1`, the OpenAI
 completions API, and `max_completion_tokens`. Give the provider a fixed local
