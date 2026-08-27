@@ -95,7 +95,7 @@ export const makeDockerLauncher = (accelerator: Accelerator): Launcher => ({
   logTail: (reference: HandleReference) =>
     reference.kind !== "docker"
       ? Effect.succeed("")
-      : docker(["logs", "--tail", "60", reference.container]).pipe(
+    : docker(["logs", "--tail", "400", reference.container]).pipe(
           Effect.map((result) =>
             `${result.stdout}\n${result.stderr}`.trim().slice(-LOG_TAIL_BYTES),
           ),

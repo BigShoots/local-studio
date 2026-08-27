@@ -24,7 +24,7 @@ export interface Launcher {
 
 /** Uniform tail length for every failure path — the old code truncated the same crash to
  *  200 chars on one path and 20 lines on another. */
-export const LOG_TAIL_BYTES = 4_096;
+export const LOG_TAIL_BYTES = 32_768;
 
 export const spawnFailed = (detail: string): Effect.Effect<never, LaunchFailure> =>
   Effect.fail<LaunchFailure>({ kind: "spawn-failed", detail });
