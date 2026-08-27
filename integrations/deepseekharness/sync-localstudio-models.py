@@ -16,12 +16,10 @@ SETTINGS = DSH / "settings.yaml"
 PROVIDER = "localstudio"
 QWEN38_RE = re.compile(r"qwen3[._-]?8", re.I)
 QWEN38_REASONING_EFFORTS = {
-    "off": "off",
-    "minimal": "auto",
+    "off": "none",
     "low": "low",
     "medium": "medium",
-    "high": "high",
-    "max": "max",
+    "xhigh": "xhigh",
 }
 
 

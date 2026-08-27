@@ -139,10 +139,17 @@ function isInklingModelId(modelId: string): boolean {
   return modelId.toLowerCase().includes("inkling");
 }
 
+function isQwen38ModelId(modelId: string): boolean {
+  return /qwen3[._-]?8/iu.test(modelId);
+}
+
 export function controllerModelThinkingLevels(
   reasoning: boolean,
   modelId = "",
 ): AgentThinkingLevel[] {
+  if (reasoning && isQwen38ModelId(modelId)) {
+    return ["off", "low", "medium", "xhigh"];
+  }
   if (reasoning && isInklingModelId(modelId)) {
     return ["off", "minimal", "low", "medium", "high", "max"];
   }
@@ -454,6 +461,11 @@ function isInklingReasoningModel(model: AgentModel): boolean {
   return model.reasoning && id.includes("inkling");
 }
 
+function isQwen38ReasoningModel(model: AgentModel): boolean {
+  const id = `${model.id} ${model.rawId ?? ""} ${model.name}`;
+  return model.reasoning && isQwen38ModelId(id);
+}
+
 const VLLM_OPENAI_COMPAT: OpenAICompletionsCompat = {
   supportsStore: false,
   supportsDeveloperRole: false,
@@ -473,6 +485,16 @@ const CONTROLLER_THINKING_LEVEL_MAP = {
   max: "max",
 } as const;
 
+const QWEN38_THINKING_LEVEL_MAP = {
+  off: "none",
+  minimal: null,
+  low: "low",
+  medium: "medium",
+  high: null,
+  xhigh: "xhigh",
+  max: null,
+} as const;
+
 export function modelsToPiModels(models: AgentModel[]) {
   return models.map((model) => {
     // The hosted DeepSeek API uses a `thinking` object and requires an empty
@@ -483,6 +505,7 @@ export function modelsToPiModels(models: AgentModel[]) {
     const deepSeekReasoning =
       isDeepSeekReasoningModel(model) && !isControllerBackedModel(model);
     const inklingReasoning = isInklingReasoningModel(model);
+    const qwen38Reasoning = isQwen38ReasoningModel(model);
     return {
       id: model.rawId ?? model.id,
       name: model.name,
@@ -493,7 +516,11 @@ export function modelsToPiModels(models: AgentModel[]) {
       maxTokens: model.maxTokens,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       ...(model.controllerUrl && model.reasoning
-        ? { thinkingLevelMap: CONTROLLER_THINKING_LEVEL_MAP }
+        ? {
+            thinkingLevelMap: qwen38Reasoning
+              ? QWEN38_THINKING_LEVEL_MAP
+              : CONTROLLER_THINKING_LEVEL_MAP,
+          }
         : deepSeekReasoning
         ? {
             thinkingLevelMap: {

@@ -26,10 +26,8 @@ The provider entry should use `http://127.0.0.1:1236/v1`, the OpenAI
 completions API, and `max_completion_tokens`. Give the provider a fixed local
 client key such as `local-studio`; the switch proxy replaces it with the real
 controller credential. Set `compat.supportsReasoningEffort` to `true` so DSH
-shows the reasoning selector. Qwen3.8 recipes expose Off, Minimal, Low, Medium,
-High, and Max. They map to vLLM's native `off`, `auto`, `low`, `medium`, `high`,
-and `max` values, matching Local Studio's built-in chat. DSH calls Local
-Studio's Auto setting Minimal because Auto is not a DSH selector ID.
+shows the reasoning selector. Qwen3.8 recipes expose Off, Low, Medium, and
+XHigh; these map to vLLM's native `none`, `low`, `medium`, and `xhigh` values.
 
 Run the helpers alongside DeepSeekHarness:
 
