@@ -9,6 +9,9 @@ automatic model-switch behavior as the existing LM Studio integration.
 - `localstudio-switch-proxy.py` presents an OpenAI-compatible endpoint on
   `127.0.0.1:1236`. Before forwarding inference, it launches the requested
   recipe and evicts any other Local Studio model.
+- `lan-proxy.py` exposes DSH's loopback listener to the trusted LAN without
+  timing out persistent event streams. The connection timeout applies only
+  while opening the upstream socket, so UI state survives idle periods.
 - `localstudio_api.py` loads the controller key from the environment or the
   controller `.env` file without copying that key into DeepSeekHarness.
 - `patch-dsh-zero-usage.py` prevents failed retry records with zero usage from
@@ -31,6 +34,7 @@ Run the helpers alongside DeepSeekHarness:
 ```bash
 export LOCALSTUDIO_CONTROLLER_ENV=/path/to/local-studio/.env
 python3 ~/.dsh/localstudio-switch-proxy.py &
+python3 ~/.dsh/lan-proxy.py &
 python3 ~/.dsh/sync-localstudio-models.py --watch &
 dsh web
 ```
