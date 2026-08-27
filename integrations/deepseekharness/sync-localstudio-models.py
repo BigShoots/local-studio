@@ -16,10 +16,12 @@ SETTINGS = DSH / "settings.yaml"
 PROVIDER = "localstudio"
 QWEN38_RE = re.compile(r"qwen3[._-]?8", re.I)
 QWEN38_REASONING_EFFORTS = {
-    "off": "none",
+    "off": "off",
+    "minimal": "auto",
     "low": "low",
     "medium": "medium",
-    "xhigh": "xhigh",
+    "high": "high",
+    "max": "max",
 }
 
 
@@ -118,7 +120,7 @@ def merged_models(
     merged: list[dict[str, object]] = []
     for model in discovered:
         old = previous.get(str(model["id"]), {})
-        row = {"id": model["id"], "name": old.get("name") or model.get("name")}
+        row = {"id": model["id"], "name": model.get("name") or old.get("name")}
         for key in ("contextWindow", "maxTokens", "input", "reasoningEfforts"):
             if key in model:
                 row[key] = model[key]
@@ -188,6 +190,7 @@ def model_signature(model: dict[str, object]) -> tuple[object, ...]:
     reasoning_efforts = model.get("reasoningEfforts")
     return (
         model.get("id"),
+        model.get("name"),
         model.get("contextWindow"),
         tuple(model.get("input", [])) if isinstance(model.get("input"), list) else (),
         tuple(reasoning_efforts.items()) if isinstance(reasoning_efforts, dict) else (),
