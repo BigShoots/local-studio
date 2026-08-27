@@ -32,12 +32,8 @@ export const isRecipeRunning = (
   options: RecipeMatchOptions = {},
 ): boolean => {
   const canonicalName = (recipe.served_model_name ?? "").toLowerCase();
-  if (
-    canonicalName &&
-    current.served_model_name &&
-    current.served_model_name.toLowerCase() === canonicalName
-  ) {
-    return true;
+  if (canonicalName && current.served_model_name) {
+    return current.served_model_name.toLowerCase() === canonicalName;
   }
 
   if (!current.model_path) {
